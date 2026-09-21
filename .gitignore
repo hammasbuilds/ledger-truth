@@ -1,0 +1,8 @@
+# 103 MB of FinQA. scripts/fetch_data.py pulls it back from the authors' repo.
+data/*.json
+
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
