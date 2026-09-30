@@ -88,18 +88,6 @@ answer silently means the second.
 
 Rare. Worth knowing the program language permits it at all.
 
-## Three numbers that were wrong before they were right
-
-Every headline here started as a worse number that turned out to be mine.
-
-1. **5.4% mismatch** → 0.2%, once `%` scaled and `greater` answered in words.
-2. **38.8% ungrounded** → 8.0%. The number-matching regex was written inside a
-   double-quoted shell command, which ate its backslashes, so nothing in the prose ever
-   matched. It now lives in a module constant with
-   `test_numbers_are_found_in_both_the_table_and_the_text` guarding it.
-3. **1.1% ambiguous table rows** started as a suspected benchmark defect and is a real but
-   minor one, reported at its actual size.
-
 ## Layout
 
 ```
