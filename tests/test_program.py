@@ -107,3 +107,10 @@ def test_agrees_is_relative():
     assert P.agrees(94.0001, 94.0)
     assert not P.agrees(94.0, 90.0)
     assert P.agrees(0.0, 0.0)
+
+
+def test_nested_calls_are_rejected_not_half_run():
+    """FinQA writes programs flat; a nested call used to return the inner step."""
+    assert P.run("divide(subtract(5829, 5735), 5735)").status == P.BAD_PROGRAM
+    assert P.run("subtract(5829, 5735) junk").status == P.BAD_PROGRAM
+    assert P.agrees(P.run("subtract(5829, 5735), divide(#0, 5735)").value, 0.016390)

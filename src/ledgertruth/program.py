@@ -3,7 +3,7 @@
 A FinQA answer is not a span. It is a program:
 
     subtract(5829, 5735)
-    divide(subtract(5829, 5735), 5735)
+    subtract(5829, 5735), divide(#0, 5735)
 
 Operands are literals lifted from the filing, or `#0`, `#1` … referring back to
 earlier steps. Ten operators cover the whole training set: divide, subtract,
@@ -94,6 +94,11 @@ def run(program: str, table: list[list[str]] | None = None) -> Result:
     """Execute a gold program. Returns the value of its last step."""
     parsed = steps(program)
     if not parsed:
+        return Result(BAD_PROGRAM)
+    # FinQA programs are flat. Anything left once the steps are removed — a
+    # nested call such as divide(subtract(a, b), b), stray text — would
+    # otherwise be dropped silently and the inner step's value returned.
+    if STEP.sub("", program).replace(",", "").strip():
         return Result(BAD_PROGRAM)
 
     values: list[float] = []
