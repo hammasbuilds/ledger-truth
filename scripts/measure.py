@@ -56,6 +56,21 @@ def the_self_check() -> None:
                 st["bad"] += 1
         print(f"{split:<8}{st['ok'] / len(qs):>12.1%}{st['bad'] / len(qs):>11.1%}"
               f"{st['bad_program'] / len(qs):>11.1%}")
+
+    print("\nwithout the two conventions (% read as-is, gold compared as numbers only)")
+    print(f"{'split':<8}{'mismatch':>11}")
+    for split in corpus.SPLITS:
+        qs = corpus.load(split)
+        bad = 0
+        for q in qs:
+            result = P.run(q.program.replace("%", ""), [list(r) for r in q.table])
+            if result.ran and not (
+                isinstance(q.answer, (int, float))
+                and not isinstance(q.answer, bool)
+                and P.agrees(result.value, float(q.answer))
+            ):
+                bad += 1
+        print(f"{split:<8}{bad / len(qs):>11.1%}")
     print("\n  ^ 99% of gold programs reach their own gold answer. Getting there")
     print("    needed two conventions that are not written down anywhere:")
     print("      * a trailing % scales by 1/100 — divide(9896, 23.6%) is 41932,")
@@ -72,16 +87,7 @@ def the_ungrounded() -> None:
     for split in corpus.SPLITS:
         qs = corpus.load(split)
         bad = [q for q in qs if q.ungrounded]
-        in_question = 0
-        for q in bad:
-            asked = {
-                round(v, 6)
-                for t in corpus.NUMBER_IN_TEXT.findall(q.question)
-                if (v := P.as_number(t)) is not None
-            }
-            if any(v in asked for v in q.ungrounded):
-                in_question += 1
-        unsourceable = len(bad) - in_question
+        unsourceable = sum(1 for q in bad if q.unsourceable)
         print(f"{split:<8}{len(qs):>11,}{len(bad) / len(qs):>21.1%}"
               f"{unsourceable / len(qs):>26.1%}")
 
@@ -103,26 +109,37 @@ def the_ungrounded() -> None:
 
 def the_table_ops() -> None:
     rule("a smaller problem: row labels are not unique")
-    total = ambiguous = 0
+    total = ambiguous = differing = 0
     for split in corpus.SPLITS:
         for q in corpus.load(split):
             for operator, operands in P.steps(q.program):
                 if operator in P.TABLE_OPS and operands:
                     total += 1
                     wanted = operands[0].strip().lower()
-                    hits = sum(
-                        1 for row in q.table if row and row[0].strip().lower() == wanted
-                    )
-                    ambiguous += hits > 1
+                    hits = [
+                        tuple(row) for row in q.table
+                        if row and row[0].strip().lower() == wanted
+                    ]
+                    ambiguous += len(hits) > 1
+                    differing += len(set(hits)) > 1
     print(f"table_* operations across all splits       {total:>6}")
     print(f"  naming a row label that occurs twice     {ambiguous:>6}   "
           f"{ambiguous / total:.1%}")
+    print(f"  ...where the duplicate rows hold different values {differing:>2}   "
+          f"{differing / total:.1%}")
     print("\n  ^ table_average('fourth quarter') on a table listing two years has")
     print("    two answers, and the gold answer silently means the second. Rare,")
-    print("    and worth knowing the program language allows it at all.")
+    print("    and worth knowing the program language allows it at all. The executor")
+    print("    takes the first matching row, so those questions count as mismatches.")
 
 
 def main() -> None:
+    missing = [s for s in corpus.SPLITS if not corpus.available(s)]
+    if missing:
+        print(f"FinQA split(s) {', '.join(missing)} not found in {corpus.data_dir()}.\n"
+              f"Run `python scripts/fetch_data.py` first (or set {corpus.DATA_ENV}).",
+              file=sys.stderr)
+        raise SystemExit(2)
     the_corpus()
     the_self_check()
     the_ungrounded()

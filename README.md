@@ -13,24 +13,52 @@ prose, and a gold program in a small arithmetic language:
 
 ```
 subtract(5829, 5735)
-divide(subtract(5829, 5735), 5735)
+subtract(5829, 5735), divide(#0, 5735)
 ```
+
+Steps are flat; `#0` refers to the first step's result.
 
 | Split | Questions | 1-step | 2-step | 3+ | Answer already in filing |
 |---|---:|---:|---:|---:|---:|
 | train | 6,251 | 59.5% | 32.2% | 8.3% | **2.9%** |
-| dev | 883 | 59.2% | 32.3% | 8.5% | 3.3% |
-| test | 1,147 | 57.0% | 34.4% | 8.6% | 3.3% |
+| dev | 883 | 59.2% | 32.5% | 8.3% | 3.3% |
+| test | 1,147 | 57.0% | 35.7% | 7.3% | 3.3% |
 
 Unlike most extractive benchmarks, the answer is almost never sitting in the document. This
 is arithmetic, and a retrieval baseline has nowhere to hide — which is why the corpus is
 worth checking properly rather than leaderboarding.
 
 ```
+python -m venv .venv && .venv/Scripts/activate    # source .venv/bin/activate on Linux/macOS
+pip install -e ".[dev]"
+python demo.py                 # the executor on worked examples; works without the data
 python scripts/fetch_data.py   # 103 MB from the authors' repo, not in git
 python scripts/measure.py      # every table below
-python -m pytest               # 40 tests
+python -m pytest               # 50 tests
 ```
+
+FinQA goes to `data/` by default. Set `LEDGERTRUTH_DATA=/some/dir` to keep it elsewhere;
+`fetch_data.py`, `measure.py`, the library and the tests all read it. The fetch writes to
+`<split>.json.part` and resumes an interrupted download on the next run.
+
+Without the data, `pytest` runs 31 tests and skips the 19 that read FinQA, each with a
+reason pointing at `fetch_data.py`.
+
+## Command line
+
+```
+ledgertruth run "subtract(5829, 5735), divide(#0, 5735)"        # 0.0163906
+ledgertruth run "table_average(revenue, none)" --table t.json  # t.json: [["revenue","$ 10","$ 20"]]
+ledgertruth unsourceable --split test                          # id, program, missing literal(s)
+ledgertruth unsourceable --split test --json                   # same, as JSON
+```
+
+`unsourceable` lists the questions behind the 7.6% figure below; `--filing-only` also keeps
+those whose missing number is stated in the question (the 8.0% column). `python -m ledgertruth`
+works the same. Exit status is 1 for a program that does not run, 2 for missing data or a bad
+`--table` file.
+
+From Python, `Question.unsourceable` and `Question.ungrounded` give the same two sets.
 
 ## Does the benchmark's own arithmetic work
 
@@ -46,7 +74,8 @@ It does. Getting there needed two conventions that FinQA does not document:
   which is 9896/0.236. Reading `23.6%` as 23.6 gives 419.
 - **`greater(...)` answers `"yes"`/`"no"`, not 1/0.**
 
-Miss both and the mismatch rate reads **5.4%** instead of 0.2% — which looks exactly like a
+Miss both and the train mismatch rate reads **5.4%** instead of 0.2% (dev 4.5%, test 4.7%;
+`measure.py` prints this ablation) — which looks exactly like a
 defective benchmark, and is not one. Both are pinned by tests.
 
 ## Numbers that come from nowhere
@@ -85,8 +114,10 @@ answer silently means the second.
 |---|---:|
 | `table_*` operations across all splits | 281 |
 | naming a row label that occurs twice | **3** (1.1%) |
+| …where the duplicate rows hold different values | **2** (0.7%) |
 
-Rare. Worth knowing the program language permits it at all.
+In the third case (PNC) the two rows are identical. In the two that differ, the gold answer
+uses the second row and the executor takes the first, so both count as mismatches above. Rare. Worth knowing the program language permits it at all.
 
 ## Layout
 
@@ -94,6 +125,8 @@ Rare. Worth knowing the program language permits it at all.
 scripts/fetch_data.py            FinQA from raw.githubusercontent, byte-ranged
 src/ledgertruth/program.py       the arithmetic language and an executor for it
 src/ledgertruth/corpus.py        questions, filings, and what numbers are in them
+src/ledgertruth/__main__.py      the `ledgertruth` command
 scripts/measure.py               every table above
-tests/                           40 tests, incl. the executor on hand-checked cases
+demo.py                          worked examples, no data needed
+tests/                           50 tests, incl. the executor on hand-checked cases
 ```

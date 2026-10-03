@@ -5,6 +5,12 @@ description = "Checking FinQA against itself: 7.6% of questions need a number th
 requires-python = ">=3.11"
 dependencies = []
 
+[project.optional-dependencies]
+dev = ["pytest>=7", "ruff>=0.4"]
+
+[project.scripts]
+ledgertruth = "ledgertruth.__main__:main"
+
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
