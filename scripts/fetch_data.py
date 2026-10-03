@@ -6,18 +6,27 @@
 ranges: codeload is throttled to near-nothing on this link, raw is not, and a
 single GET of a 78 MB file still truncates often enough to be worth guarding
 against. Each file is checked against its Content-Length and deleted if short,
-because a half-written JSON fails much later and much less clearly.
+because a half-written JSON fails much later and much less clearly. Bytes go to
+`<split>.json.part` first and are renamed only when complete, so an interrupted
+run never leaves a truncated `<split>.json`, and the next run resumes the part.
+
+Set LEDGERTRUTH_DATA to download somewhere other than `<repo>/data`.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
 
-DATA = Path(__file__).resolve().parents[1] / "data"
+# Same override the library reads, so fetch and load agree on the directory.
+DATA = Path(
+    os.environ.get("LEDGERTRUTH_DATA", "").strip()
+    or Path(__file__).resolve().parents[1] / "data"
+)
 BASE = "https://raw.githubusercontent.com/czyssrs/FinQA/main/dataset"
 SPLITS = ("train", "dev", "test")
 CHUNK = 4_000_000
@@ -41,9 +50,14 @@ def fetch(split: str) -> Path:
         print(f"  {out.name} already complete ({total / 1e6:.0f} MB)")
         return out
 
-    print(f"  {out.name}  {total / 1e6:.0f} MB ", end="", flush=True)
-    written = 0
-    with out.open("wb") as handle:
+    part = out.with_name(out.name + ".part")
+    written = part.stat().st_size if part.exists() else 0
+    if written > total:
+        part.unlink()
+        written = 0
+    resumed = f" (resuming at {written / 1e6:.0f} MB)" if written else ""
+    print(f"  {out.name}  {total / 1e6:.0f} MB{resumed} ", end="", flush=True)
+    with part.open("ab") as handle:
         while written < total:
             end = min(written + CHUNK, total) - 1
             request = urllib.request.Request(
@@ -62,16 +76,17 @@ def fetch(split: str) -> Path:
             written += len(block)
             print(".", end="", flush=True)
 
-    got = out.stat().st_size
+    got = part.stat().st_size
     if got != total:
-        out.unlink()
+        part.unlink()
         raise OSError(f"{out.name}: got {got:,} bytes, expected {total:,}. Removed.")
+    part.replace(out)
     print(" ok")
     return out
 
 
 def main() -> None:
-    DATA.mkdir(exist_ok=True)
+    DATA.mkdir(parents=True, exist_ok=True)
     print("fetching FinQA")
     for split in SPLITS:
         fetch(split)

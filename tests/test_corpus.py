@@ -12,6 +12,15 @@ import pytest
 from ledgertruth import corpus
 from ledgertruth import program as P
 
+# Everything here reads FinQA. A fresh clone does not have it, so the module
+# skips (not fails) until scripts/fetch_data.py has run. Point LEDGERTRUTH_DATA
+# at an empty directory to check the suite is hermetic.
+pytestmark = pytest.mark.skipif(
+    not all(corpus.available(s) for s in corpus.SPLITS),
+    reason=f"FinQA not in {corpus.data_dir()}; run `python scripts/fetch_data.py` "
+    f"(or set {corpus.DATA_ENV})",
+)
+
 SIZES = {"train": 6_251, "dev": 883, "test": 1_147}
 
 
@@ -79,3 +88,11 @@ def test_numbers_are_found_in_both_the_table_and_the_text():
 def test_literals_exclude_references_and_constants():
     q = next(x for x in corpus.load("train") if "const_" in x.program and "#0" in x.program)
     assert all(isinstance(v, float) for v in q.literals)
+
+
+def test_unsourceable_is_the_headline_definition():
+    """`unsourceable` drops questions that state the missing number themselves."""
+    qs = corpus.load("train")
+    share = sum(1 for q in qs if q.unsourceable) / len(qs)
+    assert 0.070 < share < 0.080, share
+    assert all(q.ungrounded for q in qs if q.unsourceable)
