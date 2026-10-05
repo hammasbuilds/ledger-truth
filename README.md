@@ -130,3 +130,8 @@ scripts/measure.py               every table above
 demo.py                          worked examples, no data needed
 tests/                           50 tests, incl. the executor on hand-checked cases
 ```
+
+## Licence
+
+Code: MIT, see [LICENSE](LICENSE). No dataset is committed; the fetch script downloads
+each source under its own terms.
