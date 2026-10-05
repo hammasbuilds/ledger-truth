@@ -24,8 +24,7 @@ from pathlib import Path
 
 # Same override the library reads, so fetch and load agree on the directory.
 DATA = Path(
-    os.environ.get("LEDGERTRUTH_DATA", "").strip()
-    or Path(__file__).resolve().parents[1] / "data"
+    os.environ.get("LEDGERTRUTH_DATA", "").strip() or Path(__file__).resolve().parents[1] / "data"
 )
 BASE = "https://raw.githubusercontent.com/czyssrs/FinQA/main/dataset"
 SPLITS = ("train", "dev", "test")
@@ -100,8 +99,10 @@ def main() -> None:
         print(f"  {split:<6}{len(rows):>6,}  {'ok' if good else f'EXPECTED {EXPECT[split]:,}'}")
 
     if not ok:
-        print("\nThe splits are not the published ones; stop rather than measure "
-              "something else.", file=sys.stderr)
+        print(
+            "\nThe splits are not the published ones; stop rather than measure something else.",
+            file=sys.stderr,
+        )
         raise SystemExit(1)
     print("\nFinQA ready")
 

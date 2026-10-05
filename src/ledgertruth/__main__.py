@@ -1,7 +1,7 @@
 """Command line: run a FinQA program, or list the questions that cannot be sourced.
 
-    python -m ledgertruth run "divide(9896, 23.6%)"
-    python -m ledgertruth unsourceable --split test --json
+python -m ledgertruth run "divide(9896, 23.6%)"
+python -m ledgertruth unsourceable --split test --json
 """
 
 from __future__ import annotations
@@ -24,14 +24,12 @@ def _run(args: argparse.Namespace) -> int:
             print(f"error: cannot read table {args.table}: {exc}", file=sys.stderr)
             return 2
         if not isinstance(table, list) or not all(isinstance(r, list) for r in table):
-            print("error: --table must be a JSON list of rows (lists of strings)",
-                  file=sys.stderr)
+            print("error: --table must be a JSON list of rows (lists of strings)", file=sys.stderr)
             return 2
         table = [[str(c) for c in row] for row in table]
     result = P.run(args.program, table)
     if args.json:
-        print(json.dumps({"program": args.program, "status": result.status,
-                          "value": result.value}))
+        print(json.dumps({"program": args.program, "status": result.status, "value": result.value}))
     elif result.ran:
         print(f"{result.value:g}")
     else:
@@ -51,14 +49,18 @@ def _unsourceable(args: argparse.Namespace) -> int:
         if missing:
             rows.append({"id": q.id, "program": q.program, "missing": list(missing)})
     if args.json:
-        json.dump({"split": args.split, "questions": len(questions),
-                   "flagged": len(rows), "items": rows}, sys.stdout, indent=1)
+        json.dump(
+            {"split": args.split, "questions": len(questions), "flagged": len(rows), "items": rows},
+            sys.stdout,
+            indent=1,
+        )
         print()
     else:
         for row in rows:
             print(f"{row['id']}\t{row['program']}\tmissing {row['missing']}")
-        print(f"{len(rows)} of {len(questions)} ({len(rows) / len(questions):.1%})",
-              file=sys.stderr)
+        print(
+            f"{len(rows)} of {len(questions)} ({len(rows) / len(questions):.1%})", file=sys.stderr
+        )
     return 0
 
 
@@ -74,8 +76,11 @@ def main(argv: list[str] | None = None) -> int:
 
     uns = sub.add_parser("unsourceable", help="questions whose program needs an absent number")
     uns.add_argument("--split", choices=corpus.SPLITS, default="train")
-    uns.add_argument("--filing-only", action="store_true",
-                     help="flag numbers absent from the filing even if the question has them")
+    uns.add_argument(
+        "--filing-only",
+        action="store_true",
+        help="flag numbers absent from the filing even if the question has them",
+    )
     uns.add_argument("--json", action="store_true")
     uns.set_defaults(func=_unsourceable)
 

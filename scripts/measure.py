@@ -26,15 +26,19 @@ def rule(title: str) -> None:
 
 def the_corpus() -> None:
     rule("the corpus")
-    print(f"{'split':<8}{'questions':>11}{'1-step':>9}{'2-step':>9}{'3+':>7}"
-          f"{'answer already in filing':>26}")
+    print(
+        f"{'split':<8}{'questions':>11}{'1-step':>9}{'2-step':>9}{'3+':>7}"
+        f"{'answer already in filing':>26}"
+    )
     for split in corpus.SPLITS:
         qs = corpus.load(split)
         lengths = collections.Counter(min(q.steps_count, 3) for q in qs)
         read_off = sum(1 for q in qs if q.answer_is_in_the_table)
-        print(f"{split:<8}{len(qs):>11,}{lengths[1] / len(qs):>9.1%}"
-              f"{lengths[2] / len(qs):>9.1%}{lengths[3] / len(qs):>7.1%}"
-              f"{read_off / len(qs):>26.1%}")
+        print(
+            f"{split:<8}{len(qs):>11,}{lengths[1] / len(qs):>9.1%}"
+            f"{lengths[2] / len(qs):>9.1%}{lengths[3] / len(qs):>7.1%}"
+            f"{read_off / len(qs):>26.1%}"
+        )
     print("\n  ^ unlike most extractive benchmarks, the answer is almost never")
     print("    sitting in the document: 3% of the time. This is arithmetic, and")
     print("    a retrieval baseline has nowhere to hide.")
@@ -54,8 +58,10 @@ def the_self_check() -> None:
                 st["ok"] += 1
             else:
                 st["bad"] += 1
-        print(f"{split:<8}{st['ok'] / len(qs):>12.1%}{st['bad'] / len(qs):>11.1%}"
-              f"{st['bad_program'] / len(qs):>11.1%}")
+        print(
+            f"{split:<8}{st['ok'] / len(qs):>12.1%}{st['bad'] / len(qs):>11.1%}"
+            f"{st['bad_program'] / len(qs):>11.1%}"
+        )
 
     print("\nwithout the two conventions (% read as-is, gold compared as numbers only)")
     print(f"{'split':<8}{'mismatch':>11}")
@@ -82,14 +88,14 @@ def the_self_check() -> None:
 
 def the_ungrounded() -> None:
     rule("numbers that come from nowhere")
-    print(f"{'split':<8}{'questions':>11}{'absent from filing':>21}"
-          f"{'...and from the question':>26}")
+    print(
+        f"{'split':<8}{'questions':>11}{'absent from filing':>21}{'...and from the question':>26}"
+    )
     for split in corpus.SPLITS:
         qs = corpus.load(split)
         bad = [q for q in qs if q.ungrounded]
         unsourceable = sum(1 for q in bad if q.unsourceable)
-        print(f"{split:<8}{len(qs):>11,}{len(bad) / len(qs):>21.1%}"
-              f"{unsourceable / len(qs):>26.1%}")
+        print(f"{split:<8}{len(qs):>11,}{len(bad) / len(qs):>21.1%}{unsourceable / len(qs):>26.1%}")
 
     print("\n  ^ the gold program states a number that occurs nowhere in the page")
     print("    it was written against, nor in the question. The annotator knew it")
@@ -117,16 +123,16 @@ def the_table_ops() -> None:
                     total += 1
                     wanted = operands[0].strip().lower()
                     hits = [
-                        tuple(row) for row in q.table
-                        if row and row[0].strip().lower() == wanted
+                        tuple(row) for row in q.table if row and row[0].strip().lower() == wanted
                     ]
                     ambiguous += len(hits) > 1
                     differing += len(set(hits)) > 1
     print(f"table_* operations across all splits       {total:>6}")
-    print(f"  naming a row label that occurs twice     {ambiguous:>6}   "
-          f"{ambiguous / total:.1%}")
-    print(f"  ...where the duplicate rows hold different values {differing:>2}   "
-          f"{differing / total:.1%}")
+    print(f"  naming a row label that occurs twice     {ambiguous:>6}   {ambiguous / total:.1%}")
+    print(
+        f"  ...where the duplicate rows hold different values {differing:>2}   "
+        f"{differing / total:.1%}"
+    )
     print("\n  ^ table_average('fourth quarter') on a table listing two years has")
     print("    two answers, and the gold answer silently means the second. Rare,")
     print("    and worth knowing the program language allows it at all. The executor")
@@ -136,9 +142,11 @@ def the_table_ops() -> None:
 def main() -> None:
     missing = [s for s in corpus.SPLITS if not corpus.available(s)]
     if missing:
-        print(f"FinQA split(s) {', '.join(missing)} not found in {corpus.data_dir()}.\n"
-              f"Run `python scripts/fetch_data.py` first (or set {corpus.DATA_ENV}).",
-              file=sys.stderr)
+        print(
+            f"FinQA split(s) {', '.join(missing)} not found in {corpus.data_dir()}.\n"
+            f"Run `python scripts/fetch_data.py` first (or set {corpus.DATA_ENV}).",
+            file=sys.stderr,
+        )
         raise SystemExit(2)
     the_corpus()
     the_self_check()

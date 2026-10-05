@@ -11,8 +11,11 @@ from ledgertruth.__main__ import main
 
 ROW = {
     "id": "X/2020/page_1.pdf-1",
-    "qa": {"question": "what was the change from 5735 to 5829?",
-           "program": "subtract(5829, 5735)", "exe_ans": 94.0},
+    "qa": {
+        "question": "what was the change from 5735 to 5829?",
+        "program": "subtract(5829, 5735)",
+        "exe_ans": 94.0,
+    },
     "table": [["", "2020", "2019"], ["revenue", "$ 5829", "$ 5735"]],
     "pre_text": ["margin was 12.5% in 2020"],
     "post_text": [],
@@ -42,12 +45,20 @@ def test_truncated_json_is_reported_as_a_partial_download(data):
 
 
 def test_loads_from_the_override(data):
-    unsourced = dict(ROW, id="Y/2020/page_2.pdf-1",
-                     qa={"question": "growth?", "program": "divide(5829, 23.6%)",
-                         "exe_ans": 24699.15})
-    stated = dict(ROW, id="Z/2020/page_3.pdf-1",
-                  qa={"question": "if the rate was 7% what is the cost?",
-                      "program": "multiply(5829, 7%)", "exe_ans": 408.03})
+    unsourced = dict(
+        ROW,
+        id="Y/2020/page_2.pdf-1",
+        qa={"question": "growth?", "program": "divide(5829, 23.6%)", "exe_ans": 24699.15},
+    )
+    stated = dict(
+        ROW,
+        id="Z/2020/page_3.pdf-1",
+        qa={
+            "question": "if the rate was 7% what is the cost?",
+            "program": "multiply(5829, 7%)",
+            "exe_ans": 408.03,
+        },
+    )
     (data / "test.json").write_text(json.dumps([ROW, unsourced, stated]), encoding="utf-8")
     qs = corpus.load("test")
     assert [q.ungrounded for q in qs] == [(), (0.236,), (0.07,)]
