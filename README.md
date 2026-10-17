@@ -1,137 +1,111 @@
 # ledger-truth
 
-> **7.6% of FinQA questions require a number that appears nowhere in the filing they were written against — nor in the question.** A system that only uses figures it can point to cannot answer them.
+A check of the FinQA benchmark against itself. We built it for anyone who trains or scores financial
+question-answering systems on FinQA: it runs every gold program in FinQA's arithmetic language, confirms the
+benchmark reproduces its own answers, and finds the questions whose program needs a number that appears nowhere in
+the filing page or the question. **7.6% of FinQA's training questions are like that**, so a system that only uses
+figures it can point to cannot answer them. No model is involved.
 
-**Status:** complete as a measurement. No model is involved: FinQA ships both a program and
-the answer that program should produce, so the benchmark can be checked by running it.
+## What it does
 
-## The corpus
+- **Executes FinQA programs** such as `subtract(5829, 5735), divide(#0, 5735)`, including `table_*` operations
+  over the page's table, with the two conventions FinQA does not document: a trailing `%` scales by 1/100
+  (`divide(9896, 23.6%)` is 41932, not 419) and `greater(...)` answers `yes`/`no`.
+- **Checks that each gold program reaches its gold answer**, per split.
+- **Lists the unsourceable questions**: those whose program states a literal found nowhere on the page it was
+  written against (`--filing-only` also keeps those where the number is in the question).
+- **Finds ambiguous table references**: row labels that occur twice in one table.
+- Downloads FinQA (103 MB) from the authors' repository by byte range, resuming an interrupted download.
 
-[FinQA](https://github.com/czyssrs/FinQA) — 8,281 questions written by finance
-professionals over S&P 500 earnings filings. Each carries the page's table, the surrounding
-prose, and a gold program in a small arithmetic language:
+## Sample input / output
+
+`python demo.py` (works without the data; the second half reads FinQA once it is fetched):
 
 ```
-subtract(5829, 5735)
-subtract(5829, 5735), divide(#0, 5735)
+FinQA's arithmetic language, executed
+  subtract(5829, 5735)                   -> 94           gold 94.0     agrees
+  subtract(5829, 5735), divide(#0, 5735) -> 0.0163906    gold 0.01639  agrees
+  divide(9896, 23.6%)                    -> 41932.2      gold 41932.2  agrees
+  greater(5829, 5735)                    -> 1            gold yes      agrees
+  table_average(revenue, none)           -> 15
+
+FinQA questions whose program needs a number found nowhere on the page
+  train   474 of 6,251  7.6%   e.g. AAL/2018/page_13.pdf-2  divide(9896, 23.6%)
+  dev      53 of   883  6.0%   e.g. ETR/2011/page_341.pdf-3  add(18.9, 0.3)
+  test     88 of 1,147  7.7%   e.g. GPN/2010/page_87.pdf-3  divide(6.3, 18.1)
 ```
 
-Steps are flat; `#0` refers to the first step's result.
+`ledgertruth unsourceable --split test` (first rows of 88):
 
-| Split | Questions | 1-step | 2-step | 3+ | Answer already in filing |
+```
+88 of 1147 (7.7%)
+GPN/2010/page_87.pdf-3	divide(6.3, 18.1)	missing [6.3]
+ABMD/2008/page_86.pdf-1	subtract(168, 56)	missing [56.0]
+AON/2007/page_175.pdf-2	add(155, -141), add(#0, 4)	missing [-141.0]
+ETR/2013/page_21.pdf-2	subtract(2045, 1854), divide(194, #0)	missing [194.0]
+```
+
+## Results
+
+From `python scripts/measure.py` over the full FinQA corpus (8,281 questions over S&P 500 earnings filings).
+
+**The benchmark's own arithmetic works:**
+
+| Split | Questions | Reproduces gold answer | Mismatch | Unparsed | Mismatch without the two conventions |
 |---|---:|---:|---:|---:|---:|
-| train | 6,251 | 59.5% | 32.2% | 8.3% | **2.9%** |
-| dev | 883 | 59.2% | 32.5% | 8.3% | 3.3% |
-| test | 1,147 | 57.0% | 35.7% | 7.3% | 3.3% |
+| train | 6,251 | **99.2%** | 0.2% | 0.6% | 5.4% |
+| dev | 883 | 98.0% | 0.6% | 1.5% | 4.5% |
+| test | 1,147 | **99.2%** | 0.2% | 0.6% | 4.7% |
 
-Unlike most extractive benchmarks, the answer is almost never sitting in the document. This
-is arithmetic, and a retrieval baseline has nowhere to hide — which is why the corpus is
-worth checking properly rather than leaderboarding.
+**Numbers that come from nowhere:**
 
-```
+| Split | Literal absent from the filing page | ...and from the question too |
+|---|---:|---:|
+| train | 8.0% | **7.6%** |
+| dev | 6.5% | 6.0% |
+| test | 7.9% | **7.7%** |
+
+Examples: `AAL/2018/page_13.pdf-2 divide(9896, 23.6%)` (23.6% is not on the page), `MAS/2017/page_37.pdf-1
+subtract(14.6%, 13.0%)` (neither margin is on the page). FinQA gives one page of a report; the annotator knew
+these figures from the rest of the filing.
+
+**Ambiguous row labels:** of 281 `table_*` operations across all splits, 3 (1.1%) name a row label that occurs
+twice, and in 2 (0.7%) the duplicate rows hold different values.
+
+The answer is already sitting in the filing for only 2.9-3.3% of questions, so FinQA is an arithmetic benchmark,
+not an extractive one.
+
+## Tech stack
+
+- Python 3.11+, standard library only (`json`, `re`, `urllib` for the byte-ranged download, `argparse`)
+- A small parser and executor for FinQA's program language (`src/ledgertruth/program.py`)
+- pytest and ruff for development; CI on Ubuntu and Windows
+
+## Run it
+
+```bash
 python -m venv .venv && .venv/Scripts/activate    # source .venv/bin/activate on Linux/macOS
 pip install -e ".[dev]"
 python demo.py                 # the executor on worked examples; works without the data
-python scripts/fetch_data.py   # 103 MB from the authors' repo, not in git
-python scripts/measure.py      # every table below
+python scripts/fetch_data.py   # 103 MB of FinQA from the authors' repo, not in git
+python scripts/measure.py      # every table above
 python -m pytest               # 50 tests
 ```
 
-FinQA goes to `data/` by default. Set `LEDGERTRUTH_DATA=/some/dir` to keep it elsewhere;
-`fetch_data.py`, `measure.py`, the library and the tests all read it. The fetch writes to
-`<split>.json.part` and resumes an interrupted download on the next run.
+FinQA goes to `data/` by default; set `LEDGERTRUTH_DATA=/some/dir` to keep it elsewhere. Without the data, `pytest`
+runs 31 tests and skips the 19 that read FinQA.
 
-Without the data, `pytest` runs 31 tests and skips the 19 that read FinQA, each with a
-reason pointing at `fetch_data.py`.
-
-## Command line
-
-```
+```bash
 ledgertruth run "subtract(5829, 5735), divide(#0, 5735)"        # 0.0163906
 ledgertruth run "table_average(revenue, none)" --table t.json  # t.json: [["revenue","$ 10","$ 20"]]
 ledgertruth unsourceable --split test                          # id, program, missing literal(s)
 ledgertruth unsourceable --split test --json                   # same, as JSON
 ```
 
-`unsourceable` lists the questions behind the 7.6% figure below; `--filing-only` also keeps
-those whose missing number is stated in the question (the 8.0% column). `python -m ledgertruth`
-works the same. Exit status is 1 for a program that does not run, 2 for missing data or a bad
-`--table` file.
-
-From Python, `Question.unsourceable` and `Question.ungrounded` give the same two sets.
-
-## Does the benchmark's own arithmetic work
-
-| Split | Reproduces gold answer | Mismatch | Unparsed |
-|---|---:|---:|---:|
-| train | **99.2%** | 0.2% | 0.6% |
-| dev | 98.0% | 0.6% | 1.5% |
-| test | **99.2%** | 0.2% | 0.6% |
-
-It does. Getting there needed two conventions that FinQA does not document:
-
-- **A trailing `%` scales by 1/100.** `divide(9896, 23.6%)` has a gold answer of 41932,
-  which is 9896/0.236. Reading `23.6%` as 23.6 gives 419.
-- **`greater(...)` answers `"yes"`/`"no"`, not 1/0.**
-
-Miss both and the train mismatch rate reads **5.4%** instead of 0.2% (dev 4.5%, test 4.7%;
-`measure.py` prints this ablation) — which looks exactly like a
-defective benchmark, and is not one. Both are pinned by tests.
-
-## Numbers that come from nowhere
-
-| Split | Questions | Literal absent from the filing | …and from the question too |
-|---|---:|---:|---:|
-| train | 6,251 | 8.0% | **7.6%** |
-| dev | 883 | 6.5% | 6.0% |
-| test | 1,147 | 7.9% | **7.7%** |
-
-The gold program states a number that occurs nowhere on the page it was written against,
-and nowhere in the question either.
-
-```
-AAL/2018/page_13.pdf-2     divide(9896, 23.6%)         23.6% is not on the page
-MAS/2017/page_37.pdf-1     subtract(14.6%, 13.0%)      neither margin is on the page
-FBHS/2017/page_46.pdf-2    divide(6.1, -2.5)           -2.5 is not on the page
-AMT/2005/page_84.pdf-4     divide(646560, const_1000)  646560 is not on the page
-```
-
-FinQA gives one page of a report. The annotator knew these figures from the rest of the
-filing, or computed them and wrote the result down as a literal. Either way the question is
-not answerable from what the model is shown.
-
-**This is the number that matters for anything financial.** A system that refuses to use a
-figure it cannot source will get all of these wrong. A system that scores well on them is
-producing numbers it cannot source — which is the failure mode that actually costs money,
-and the one an aggregate accuracy hides completely.
-
-## A smaller problem: row labels are not unique
-
-`table_average(fourth quarter)` on a table listing two years has two answers. The gold
-answer silently means the second.
-
-| | |
-|---|---:|
-| `table_*` operations across all splits | 281 |
-| naming a row label that occurs twice | **3** (1.1%) |
-| …where the duplicate rows hold different values | **2** (0.7%) |
-
-In the third case (PNC) the two rows are identical. In the two that differ, the gold answer
-uses the second row and the executor takes the first, so both count as mismatches above. Rare. Worth knowing the program language permits it at all.
-
-## Layout
-
-```
-scripts/fetch_data.py            FinQA from raw.githubusercontent, byte-ranged
-src/ledgertruth/program.py       the arithmetic language and an executor for it
-src/ledgertruth/corpus.py        questions, filings, and what numbers are in them
-src/ledgertruth/__main__.py      the `ledgertruth` command
-scripts/measure.py               every table above
-demo.py                          worked examples, no data needed
-tests/                           50 tests, incl. the executor on hand-checked cases
-```
+Exit status is 1 for a program that does not run, 2 for missing data or a bad `--table` file. From Python,
+`Question.unsourceable` and `Question.ungrounded` give the same two sets.
 
 ## Licence
 
-Code: MIT, see [LICENSE](LICENSE). No dataset is committed; the fetch script downloads
-each source under its own terms.
+Code: MIT, see [LICENSE](LICENSE). No dataset is committed; `fetch_data.py` downloads
+[FinQA](https://github.com/czyssrs/FinQA) (Chen et al., 2021) under its own terms.
